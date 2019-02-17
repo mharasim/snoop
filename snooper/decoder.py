@@ -39,6 +39,9 @@ import unittest
 
 import os
 
+kDsoSearchPath = os.getenv("SNOOP_DSO_SEARCH_PATH", "/lib")
+kAddr2LineBin = os.getenv("SNOOP_ADDR2LINE_BIN", "addr2line")
+
 class PathHelper():
     def __init__(self, filename):
         self.basename = os.path.basename(filename)
@@ -88,6 +91,7 @@ class DecoderManager():
             return
         helper = PathHelper(line[-1])
         helper.addPath(".")
+        helper.addPath(kDsoSearchPath)
         helper.addPath(os.path.dirname(self.filename))
         filename = helper.getFileName()
         if (filename == ""):
@@ -152,7 +156,7 @@ Sync Interface
 class Decoder():
     def __init__(self, filename):
         self.filename = filename
-        command = ['addr2line', '-f', '-C', '-e', filename]
+        command = [kAddr2LineBin, '-f', '-C', '-e', filename]
         self.decoder = Popen(command, stdin=PIPE, stdout=PIPE)
         self.mutex = QMutex()
 

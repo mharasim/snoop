@@ -37,6 +37,9 @@ from PyQt5.QtCore import pyqtSlot
 
 from decoder import DecoderManager
 
+
+kAddressByteCount = os.getenv("SNOOP_ADDRESS_BYTE_COUNT", 8)
+
 logging.basicConfig(
     format="%(asctime)-15s [%(levelname)s] %(funcName)s: %(message)s",
     level=logging.DEBUG)
@@ -51,7 +54,7 @@ class SnoopFile():
     def __init__(self):
         self.pos = 0
         # Number of bytes in address
-        self.entry_size = 8
+        self.entry_size = kAddressByteCount
         # TODO
         self.cache = {}
         self.me = self.__class__.__name__
