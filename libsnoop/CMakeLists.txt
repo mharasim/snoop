@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(snoop VERSION 1.0.0 DESCRIPTION "function instrumentation")
+project(snoop VERSION 1.0.0)
 
 find_package(Threads REQUIRED)
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.0)
 
-project(snoop VERSION 1.0.0 DESCRIPTION "test applications")
+project(snoop VERSION 1.0.0)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out/testapps)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/out/testapps)
