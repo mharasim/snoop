@@ -38,7 +38,7 @@ from PyQt5.QtCore import pyqtSlot
 from decoder import DecoderManager
 
 
-kAddressByteCount = os.getenv("SNOOP_ADDRESS_BYTE_COUNT", 8)
+kAddressByteCount = int(os.getenv("SNOOP_ADDRESS_BYTE_COUNT", 8))
 
 logging.basicConfig(
     format="%(asctime)-15s [%(levelname)s] %(funcName)s: %(message)s",
@@ -113,7 +113,7 @@ class SnoopFile():
         dec_in = []
         assert raw_len % entry_size == 0, "malformed snoop file read"
         for cnt in [i * entry_size for i in range(raw_len // entry_size)]:
-            entry = raw_in[cnt : cnt + entry_size - 1][::-1].hex()
+            entry = raw_in[cnt : cnt + entry_size][::-1].hex()
             dec_in.append(entry)
         dec_out = self.decoder_manager.decode(dec_in)
         self.pos += raw_len // entry_size
@@ -169,7 +169,7 @@ class SlidingView():
             entries = self.snoop.read(amount)
             self.snoop.seek(self.pos + self.size)
         else:
-            if (self.pos + self.size == self.snoop.size):
+            if (self.pos + self.size >= self.snoop.size):
                 return False
             if (self.pos + self.size + amount >= self.snoop.size):
                 amount = self.snoop.size - self.pos - self.size

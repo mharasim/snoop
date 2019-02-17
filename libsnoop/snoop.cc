@@ -278,6 +278,13 @@ ThreadManager::ThreadManager() : exit_flag_(false), pid_(getpid()) {
 }
 
 ThreadManager::~ThreadManager() {
+	Deinitialize();
+}
+
+void ThreadManager::Deinitialize() {
+	std::lock_guard<std::mutex> lock(shutdown_mutex_);
+	if (g_exiting)
+		return;
 	g_exiting = true;
 	if (!UpdateMemoryMapFile(pid_))
 		LOG(ERROR) << "Failed to dump memory map file";
@@ -296,25 +303,26 @@ ThreadObserver::ThreadObserver() {
 
 ThreadObserver::~ThreadObserver() {
 	LOG(INFO) << "Stop observing TID:" << tid_ << " PID:" << getpid();
+	exiting_ = true;
 	ThreadManager::GetInstance().UnregisterChannel(enter_channel_);
 	enter_channel_.reset();
 }
 
 void ThreadObserver::Enter(uintptr_t enter_addr) {
+	if (exiting_)
+		return;
 	enter_channel_->Send(enter_addr);
 }
 
 } // namespace snoop
 
 extern "C" {
-void
-__cyg_profile_func_enter(void *func,  void *caller) {
+void __cyg_profile_func_enter(void *func,  void *caller) {
 	LEAVE_ON_REENTRY();
 	if (snoop::g_exiting)
 		return;
 	g_tl_observer.Enter((uintptr_t)func);
 	LEAVE();
 }
-void
-__cyg_profile_func_exit (void *func, void *caller) {}
+void __cyg_profile_func_exit(void *func, void *caller) {}
 }

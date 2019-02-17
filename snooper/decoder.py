@@ -41,6 +41,9 @@ import os
 
 kDsoSearchPath = os.getenv("SNOOP_DSO_SEARCH_PATH", "/lib")
 kAddr2LineBin = os.getenv("SNOOP_ADDR2LINE_BIN", "addr2line")
+kMemoryMode = os.getenv("SNOOP_MEMORY_MODE", "x86_64")
+
+kArmBinOffset = 0x10000
 
 class PathHelper():
     def __init__(self, filename):
@@ -131,6 +134,8 @@ class DecoderManager():
             entry_idx = self.findEntryIdx(input_value)
             if (entry_idx >= 0):
                 offset = self.entries[entry_idx].begin
+                if (kMemoryMode == "arm" and offset == kArmBinOffset):
+                    offset = 0
                 queries[entry_idx].inputs.append(hex(input_value - offset))
                 queries[entry_idx].indexes.append(input_idx)
         for query_idx, query in enumerate(queries):

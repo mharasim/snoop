@@ -75,6 +75,8 @@ class ThreadManager : public ChannelConsumer {
 	void UnregisterChannel(std::shared_ptr<Channel> channel);
 	void ReceiveChannels();
 
+	void Deinitialize();
+
  protected:
 	void notify();
 	void close();
@@ -89,6 +91,7 @@ class ThreadManager : public ChannelConsumer {
  private:
 	std::mutex processing_mutex_;
 	std::mutex internal_state_mutex_;
+	std::mutex shutdown_mutex_;
 	std::condition_variable processing_condition_;
 	std::vector<std::shared_ptr<Channel>> channels_;
 	std::thread processing_thread_;
@@ -110,6 +113,7 @@ private:
 private:
 	pid_t tid_;
 	std::shared_ptr<Channel> enter_channel_;
+	bool exiting_ = false;
 };
 
 }; // namespace snoop
