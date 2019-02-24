@@ -39,11 +39,20 @@ import unittest
 
 import os
 
-kDsoSearchPath = os.getenv("SNOOP_DSO_SEARCH_PATH", "/lib")
+kDsoSearchPath = os.getenv("SNOOP_DSO_SEARCH_PATH", "")
 kAddr2LineBin = os.getenv("SNOOP_ADDR2LINE_BIN", "addr2line")
 kMemoryMode = os.getenv("SNOOP_MEMORY_MODE", "x86_64")
 
 kArmBinOffset = 0x10000
+
+def isDSO(filepath):
+    # TODO Find better way?
+    basename = os.path.basename(filepath)
+    if basename.endswith(".so"):
+        return True
+    if ".so." in basename:
+        return True
+    return False
 
 class PathHelper():
     def __init__(self, filename):
@@ -93,7 +102,8 @@ class DecoderManager():
         if (os.path.basename(line[-1]) == self.snoopLibName):
             return
         helper = PathHelper(line[-1])
-        helper.addPath(".")
+        for path in kDsoSearchPath.split(':'):
+            helper.addPath(path)
         helper.addPath(kDsoSearchPath)
         helper.addPath(os.path.dirname(self.filename))
         filename = helper.getFileName()
@@ -161,7 +171,10 @@ Sync Interface
 class Decoder():
     def __init__(self, filename):
         self.filename = filename
-        command = [kAddr2LineBin, '-f', '-C', '-e', filename]
+        if isDSO(filename):
+            command = [kAddr2LineBin, '--section=.text', '-f', '-C', '-e', filename]
+        else:
+            command = [kAddr2LineBin, '-f', '-C', '-e', filename]
         self.decoder = Popen(command, stdin=PIPE, stdout=PIPE)
         self.mutex = QMutex()
 

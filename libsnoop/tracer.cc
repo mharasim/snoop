@@ -51,23 +51,23 @@ struct iovec_abi {
 #endif
 
 int do_trace(pid_t pid) {
-	LOG(INFO) << "tracer started for PID:" << pid;
+	LOG(INFO, "tracer started for pid=%d", pid);
 	if (ptrace(PTRACE_ATTACH, pid, NULL, NULL) == -1) {
-		LOG(ERROR) << "ptrace PTRACE_ATTACH: " << strerror(errno);
+		LOG(ERROR, "ptrace PTRACE_ATTACH: %s", strerror(errno));
 		return RET_ERR;
 	}
 	if (waitpid(pid, 0, 0) == -1) {
-		LOG(ERROR) << "waitpid PTRACE_ATTACH: " << strerror(errno);
+		LOG(ERROR, "waitpid PTRACE_ATTACH: %s", strerror(errno));
 		return RET_ERR;
 	}
 	for (;;) {
 		// Trap on syscall
 		if (ptrace(PTRACE_SYSCALL, pid, 0, 0) == -1) {
-				LOG(ERROR) << "ptrace PTRACE_SYSCALL: " << strerror(errno);
+				LOG(ERROR, "ptrace PTRACE_SYSCALL: %s", strerror(errno));
 				return RET_ERR;
 		}
 		if (waitpid(pid, 0, 0) == -1) {
-				LOG(ERROR) << "waitpid PTRACE_SYSCALL: " << strerror(errno);
+				LOG(ERROR, "waitpid PTRACE_SYSCALL: %s", strerror(errno));
 				return RET_ERR;
 		}
 		// Get syscall arguments
@@ -79,13 +79,13 @@ int do_trace(pid_t pid) {
 		iov.handle = (void*)&regs;
 		iov.size = sizeof(regs);
 		if (ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &iov) == -1) {
-				LOG(ERROR) << "ptrace PTRACE_GETREGSET: " << strerror(errno);
+				LOG(ERROR, "ptrace PTRACE_GETREGSET: %s", strerror(errno));
 				return RET_ERR;
 		}
 #else
 		struct user_regs_struct regs;
 		if (ptrace(PTRACE_GETREGS, pid, 0, &regs) == -1) {
-				LOG(ERROR) << "ptrace PTRACE_GETREGS: " << strerror(errno);
+				LOG(ERROR, "ptrace PTRACE_GETREGS: %s", strerror(errno));
 				return RET_ERR;
 		}
 #endif
@@ -98,11 +98,11 @@ int do_trace(pid_t pid) {
 
 		// Trap on syscall return
 		if (ptrace(PTRACE_SYSCALL, pid, 0, 0) == -1) {
-				LOG(ERROR) << "ptrace PTRACE_SYSCALL (return): " << strerror(errno);
+				LOG(ERROR, "ptrace PTRACE_SYSCALL (return): %s", strerror(errno));
 				return RET_ERR;
 		}
 		if (waitpid(pid, 0, 0) == -1) {
-				LOG(ERROR) << "waitpid PTRACE_SYSCALL (return): " << strerror(errno);
+				LOG(ERROR, "waitpid PTRACE_SYSCALL (return): %s", strerror(errno));
 				return RET_ERR;
 		}
 		// Returned from mmap syscall - update process memory map
@@ -119,7 +119,7 @@ int do_trace(pid_t pid) {
 
 int main(int argc, char** argv) {
 	if (argc < 2) {
-		LOG(ERROR) << "expecting pid to trace as 1 argument";
+		LOG(ERROR, "expecting pid to trace as 1 argument");
 		return RET_ERR;
 	}
 	pid_t pid = std::stoi(std::string(argv[1]));

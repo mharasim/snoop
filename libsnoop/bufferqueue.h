@@ -28,14 +28,12 @@ SOFTWARE.
 #include <functional>
 #include <algorithm>
 
-#include "log.h"
-
 template<class Buffer, std::size_t SIZE> class BufferQueue {
 public:
 	using Callback = std::function<void (Buffer&)>;
 	struct Wrapper {
 		Buffer buffer_;
-		std::atomic_bool public_{false};
+		std::atomic_bool public_;
 	};
 	// Producer
 	Buffer* Get() {

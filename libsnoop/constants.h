@@ -29,8 +29,9 @@ SOFTWARE.
 namespace constants {
 	static const std::size_t kDefaultChannelSize = 512;
 	static const std::size_t kDefaultChannelBucketSize = 1024;
-	static const std::string kEnterChannelName = "funcenter";
-	static const std::string kLeaveChannelName = "funcleave";
+	static const std::size_t kNameSizeMax = 256;
+	static const char* kEnterChannelName = "funcenter";
+	static const char* kLeaveChannelName = "funcleave";
 }; // constants
 
 #endif // __CONSTANTS_H__

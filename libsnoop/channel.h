@@ -24,13 +24,14 @@ SOFTWARE.
 #ifndef __CHANNEL_H__
 #define __CHANNEL_H__
 
+#include <cstring>
+
 #include <functional>
 #include <memory>
 #include <vector>
 
 #include "bufferqueue.h"
 #include "constants.h"
-#include "log.h"
 
 template<class Message, std::size_t SIZE = constants::kDefaultChannelSize>
 class Channel {
@@ -45,11 +46,17 @@ class Channel {
 	 public:
 		virtual void Notify() = 0;
 	};
-	Channel(const std::string& name)
-		: name_(name), consumer_(nullptr)
+	Channel()
+		: consumer_(nullptr)
 	{}
 	~Channel() {
 		listeners_.clear();
+	}
+	bool SetName(const char* name, pid_t pid) {
+		const auto ret = std::snprintf(name_, constants::kNameSizeMax, "%s_%d", name, pid);
+		if (ret < 0 || ret >= constants::kNameSizeMax)
+			return false;
+		return true;
 	}
 	bool Send(const Message& message) {
 		MessageBucket* bucket = queue_.Get();
@@ -82,7 +89,7 @@ class Channel {
 		queue_.Consume(std::bind(&Channel::NotifyMessageBucket, this,
 					std::placeholders::_1));
 	}
-	std::string GetName() const {
+	const char* GetName() const {
 		return name_;
 	}
  protected:
@@ -95,7 +102,7 @@ class Channel {
 	std::vector<std::unique_ptr<ChannelListener>> listeners_;
 	ChannelConsumer* consumer_;
 	long drop_count_;
-	std::string name_;
+	char name_[constants::kNameSizeMax];
 };
 
 #endif // __CHANNEL_H__

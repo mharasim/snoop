@@ -27,7 +27,6 @@ SOFTWARE.
 // Linux
 #include <sys/types.h> // pid_t
 
-#include <string>
 #include <fstream>
 #include <mutex>
 #include <memory>
@@ -38,6 +37,7 @@ SOFTWARE.
 #include <atomic>
 
 #include "channel.h"
+#include "constants.h"
 
 namespace snoop {
 
@@ -53,7 +53,7 @@ using MessageBucket = Channel::MessageBucket;
 
 class StreamingBucketHandler : public ChannelListener {
  public:
-	StreamingBucketHandler(const std::string& name);
+	StreamingBucketHandler(const char* name);
 	~StreamingBucketHandler();
 	// ChannelListener
 	void OnMessageBucket(MessageBucket& bucket) override;
@@ -106,9 +106,6 @@ public:
 	~ThreadObserver();
 
 	void Enter(uintptr_t enter_addr);
-
-private:
-	pid_t tid();
 
 private:
 	pid_t tid_;

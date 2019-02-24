@@ -33,11 +33,16 @@ SOFTWARE.
 // strdup
 #include <string.h>
 
-#include "log.h"
+#include <string>
+
 #include "tracer.h"
 #include "snoop.h"
+#include "log.h"
 
 namespace {
+
+static const char* kExt = ".snoop";
+static const char* kMapExt = ".map";
 
 bool CopyUpdate(const std::string& src, const std::string& dst) {
 	static std::vector<std::string> lines = {};
@@ -69,28 +74,28 @@ bool CopyUpdate(const std::string& src, const std::string& dst) {
 bool Copy(const char* src, const char* dst) {
 	int src_fd = open(src, O_RDONLY);
 	if (src_fd < 0) {
-		LOG(ERROR) << "Failed to open src file path " << src;
+		LOG(ERROR, "Failed to open src file path=%s", src);
 		return false;
 	}
 	off_t src_size = lseek(src_fd, 0, SEEK_END) + 1;
 	if (src_size < 0) {
-		LOG(ERROR) << "Failed to get src file size " << src;
+		LOG(ERROR, "Failed to get src file size %s", src);
 		close(src_fd);
 		return false;
 	}
 	if (lseek(src_fd, 0, SEEK_SET) != 0) {
-		LOG(ERROR) << "Failed to set src file pos to 0 " << src;
+		LOG(ERROR, "Failed to set src file pos to 0 %s", src);
 		close(src_fd);
 		return false;
 	}
 	int dst_fd = open(dst, O_RDWR | O_CREAT, 0644);
 	if (dst_fd < 0) {
-		LOG(ERROR) << "Failed to open dst file path " << dst;
+		LOG(ERROR, "Failed to open dst file path=%s", dst);
 		close(src_fd);
 		return false;
 	}
 	if (posix_fallocate(dst_fd, 0, src_size) < 0) {
-		LOG(ERROR) << "Failed to fallocate dst file " << dst;
+		LOG(ERROR, "Failed to fallocate dst file=%s", dst);
 		close(src_fd);
 		close(dst_fd);
 		return false;
@@ -101,7 +106,7 @@ bool Copy(const char* src, const char* dst) {
 		if (num_read < 0) {
 			if (errno == EINTR)
 				continue;
-			LOG(ERROR) << "Failed to read src file " << src;
+			LOG(ERROR, "Failed to read src file=%s", src);
 			close(src_fd);
 			close(dst_fd);
 			return false;
@@ -110,7 +115,6 @@ bool Copy(const char* src, const char* dst) {
 			break;
 		write(dst_fd, buf, num_read);
 	}
-	LOG(INFO) << "Copied src " << src << " to dst " << dst;
 	close(src_fd);
 	close(dst_fd);
 	return true;
@@ -119,7 +123,7 @@ bool Copy(const char* src, const char* dst) {
 pid_t SpawnTracer(pid_t pid) {
 	pid_t tracer_pid = fork();
 	if (tracer_pid == 0) {
-#ifdef TRACER_USE_EXECVE
+#if defined(SNOOP_TRACER_USE_EXECVE)
 		std::string name = "tracer";
 		std::string param1 = std::to_string(pid);
 		std::vector<char *> params;
@@ -132,17 +136,13 @@ pid_t SpawnTracer(pid_t pid) {
 		std::exit(EXIT_SUCCESS);
 #endif // TRACER_USE_EXECVE
 	} else if (tracer_pid > 0) {
-		LOG(INFO) << "Tracer process (pid=" << tracer_pid << ") spawned for pid=" << pid;
+		LOG(INFO, "Tracer process started tracer_pid=%d pid=%d", tracer_pid, pid);
 		return tracer_pid;
 	} else {
-		LOG(ERROR) << "Fail to spawn tracer process for pid=" << pid;
+		LOG(ERROR, "Fail to spawn tracer process for pid=%d", pid);
 		return 0;
 	}
 }
-
-static const std::string kSpace = std::string("_");
-static const std::string kExt = std::string(".snoop");
-static const std::string kMapExt = std::string(".map");
 
 std::string MemoryMapFileName(pid_t pid) {
 	return std::string("/proc/") + std::to_string(pid) + std::string("/maps");
@@ -176,7 +176,7 @@ namespace snoop {
 bool DumpMemoryMapFile(pid_t pid) {
 	std::string name = std::to_string(pid) + kMapExt;
 	if (!Copy(MemoryMapFileName(pid).c_str(), name.c_str())) {
-		LOG(ERROR) << "Failed to copy memory map file";
+		LOG(ERROR, "Failed to copy memory map file");
 		return false;
 	}
 	return true;
@@ -185,14 +185,15 @@ bool DumpMemoryMapFile(pid_t pid) {
 bool UpdateMemoryMapFile(pid_t pid) {
 	std::string name = std::to_string(pid) + kMapExt;
 	if (!CopyUpdate(MemoryMapFileName(pid), name)) {
-		LOG(ERROR) << "Failed to copy memory map file";
+		LOG(ERROR, "Failed to copy memory map file");
 		return false;
 	}
 	return true;
 }
 
-StreamingBucketHandler::StreamingBucketHandler(const std::string& name) {
+StreamingBucketHandler::StreamingBucketHandler(const char* name) {
 	stream_.open(name, std::ios::out | std::ios::binary | std::ios::app);
+	LOG(INFO, "StreamingBucketHandler name=%s", name);
 }
 StreamingBucketHandler::~StreamingBucketHandler() {
 	stream_.close();
@@ -219,9 +220,15 @@ void ThreadManager::Notify() {
 
 void ThreadManager::RegisterChannel(std::shared_ptr<Channel> channel) {
 	std::lock_guard<std::mutex> lock(internal_state_mutex_);
-	LOG(INFO) << "Register channel:" << channel->GetName();
+	LOG(INFO, "Register channel name=%s pid=%d", channel->GetName(), pid_);
+	char name[constants::kNameSizeMax];
+	const auto ret = std::snprintf(name, constants::kNameSizeMax, "%s_%d%s",
+																 channel->GetName(), pid_, kExt);
+	if (ret < 0 || ret >= constants::kNameSizeMax) {
+		LOG(ERROR, "Failed to construct channel listener name");
+		return;
+	}
 	channels_.push_back(channel);
-	const auto name = channel->GetName() + kSpace + std::to_string(pid_) + kExt;
 	std::unique_ptr<StreamingBucketHandler> listener(
 			new StreamingBucketHandler(name));
 	channel->RegisterListener(std::move(listener));
@@ -230,7 +237,7 @@ void ThreadManager::RegisterChannel(std::shared_ptr<Channel> channel) {
 
 void ThreadManager::UnregisterChannel(std::shared_ptr<Channel> channel) {
 	std::lock_guard<std::mutex> lock(internal_state_mutex_);
-	LOG(INFO) << "Unregister channel:" << channel->GetName() << " PID: " << getpid();
+	LOG(INFO, "Unregister channel name=%s pid=%d", channel->GetName(), pid_);
 	auto channel_iterator =
 		std::find(channels_.begin(), channels_.end(), channel);
 	if (channel_iterator != channels_.end()) {
@@ -261,15 +268,17 @@ bool ThreadManager::should_exit() {
 }
 
 ThreadManager::ThreadManager() : exit_flag_(false), pid_(getpid()) {
-	LOG(INFO) << "Creating thread manager pid: " << pid_;
+	LOG(INFO, "Creating thread manager pid=%d", pid_);
+#if defined(SNOOP_SPAWN_TRACER)
 	SpawnTracer(pid_);
+#endif
 	processing_thread_ = std::thread([this]() {
-		LOG(INFO) << "Processing thread started";
+		LOG(INFO, "Processing thread started");
 		std::unique_lock<std::mutex> lock(processing_mutex_);
 		while(true) {
 			processing_condition_.wait(lock);
 			if (should_exit()) {
-				LOG(INFO) << "Processing thread exiting";
+				LOG(INFO, "Processing thread exiting pid=%d", pid_);
 				return;
 			}
 			ReceiveChannels();
@@ -278,7 +287,8 @@ ThreadManager::ThreadManager() : exit_flag_(false), pid_(getpid()) {
 }
 
 ThreadManager::~ThreadManager() {
-	Deinitialize();
+	LOG(INFO, "ThreadManager dtor");
+	snoop::ThreadManager::GetInstance().Deinitialize();
 }
 
 void ThreadManager::Deinitialize() {
@@ -287,22 +297,24 @@ void ThreadManager::Deinitialize() {
 		return;
 	g_exiting = true;
 	if (!UpdateMemoryMapFile(pid_))
-		LOG(ERROR) << "Failed to dump memory map file";
-	LOG(INFO) << "Destroying thread manager";
+		LOG(ERROR, "Failed to dump memory map file");
+	LOG(INFO, "Destroying thread manager pid=%d", pid_);
 	close();
 	processing_thread_.join();
+	for (auto& channel : channels_) {
+		LOG(INFO, "Finalize leftover channel name=%s", channel->GetName());
+		channel->Finalize();
+	}
 }
+
 
 ThreadObserver::ThreadObserver() {
 	tid_ = (pid_t)syscall(SYS_gettid);
-	LOG(INFO) << "Observe TID:" << tid_ << " PID: " << getpid();
-	enter_channel_ = std::make_shared<Channel>(
-			constants::kEnterChannelName + kSpace + std::to_string(tid_));
-	ThreadManager::GetInstance().RegisterChannel(enter_channel_);
+	LOG(INFO, "Observe tid=%d", tid_);
 }
 
 ThreadObserver::~ThreadObserver() {
-	LOG(INFO) << "Stop observing TID:" << tid_ << " PID:" << getpid();
+	LOG(INFO, "Stop observing tid=%d", tid_);
 	exiting_ = true;
 	ThreadManager::GetInstance().UnregisterChannel(enter_channel_);
 	enter_channel_.reset();
@@ -311,6 +323,13 @@ ThreadObserver::~ThreadObserver() {
 void ThreadObserver::Enter(uintptr_t enter_addr) {
 	if (exiting_)
 		return;
+	if (!enter_channel_) {
+		auto enter_channel = std::make_shared<Channel>();
+		if (!enter_channel->SetName(constants::kEnterChannelName, tid_))
+			return;
+		enter_channel_ = enter_channel;
+		ThreadManager::GetInstance().RegisterChannel(enter_channel_);
+	}
 	enter_channel_->Send(enter_addr);
 }
 
@@ -325,4 +344,10 @@ void __cyg_profile_func_enter(void *func,  void *caller) {
 	LEAVE();
 }
 void __cyg_profile_func_exit(void *func, void *caller) {}
+
+__attribute__((destructor)) void DsoDestructor() {
+	LOG(INFO, "DSO destructor");
+	snoop::ThreadManager::GetInstance().Deinitialize();
+}
+
 }

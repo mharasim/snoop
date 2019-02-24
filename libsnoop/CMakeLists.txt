@@ -6,6 +6,19 @@ find_package(Threads REQUIRED)
 
 file(GLOB SOURCES *.cc)
 
+if(SNOOP_LOG_DISABLED)
+    add_definitions(-DSNOOP_LOG_DISABLED)
+endif()
+if(SNOOP_LOG_LEVEL)
+    add_definitions(-DSNOOP_LOG_LEVEL=${SNOOP_LOG_LEVEL})
+endif()
+if(SNOOP_SPAWN_TRACER)
+    add_definitions(-DSNOOP_SPAWN_TRACER)
+endif()
+if(SNOOP_TRACER_USE_EXECVE)
+    add_definitions(-DSNOOP_TRACER_USE_EXECVE)
+endif()
+
 add_definitions(-std=c++11)
 add_library(snoop SHARED ${SOURCES})
 

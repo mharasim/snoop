@@ -24,64 +24,35 @@ SOFTWARE.
 #ifndef __LOG_H__
 #define __LOG_H__
 
-#include <sstream>
-#include <iostream>
+#include <cstdio>
+// stoi
 #include <string>
 
-namespace logger {
+namespace logging {
 
-enum class Level { ERROR = 0, WARNING, INFO, DEBUG, MAX};
+enum Level { ERROR = 0, WARNING, INFO, DEBUG, MAX };
 
-static Level GetLogLevel() {
-	const char* env_level = getenv("LOG_LEVEL");
-	if (!env_level)
-		return Level::WARNING;
-	int level = std::stoi(env_level);
-	if (level < 0 || level >= (int)(Level::MAX))
-		return Level::WARNING;
-	return (Level)(level);
-}
-static const Level kLevel = GetLogLevel();
-static const std::string kSep = " : ";
+#if defined(SNOOP_LOG_LEVEL)
+static const Level kLevel = (Level)(SNOOP_LOG_LEVEL);
+#else
+static const Level kLevel = ERROR;
+#endif
 
-static std::string ToString(const Level& level) {
-	switch(level) {
-		case Level::ERROR:
-			return "[ERROR]";
-		case Level::WARNING:
-			return "[WARNING]";
-		case Level::INFO:
-			return "[INFO]";
-		case Level::DEBUG:
-			return "[DEBUG]";
-		case Level::MAX:
-			return "[MAX]";
-		default:
-			return "Unknown level";
+} // namespace logging
+
+#if defined(SNOOP_LOG_DISABLED)
+#define SNOOP_LOG_NOLOG
+#define LOG(_level_, _format_, ...) SNOOP_LOG_NOLOG
+#else
+#define PREFIX_ERROR "[ERROR] "
+#define PREFIX_WARNING "[WARNING] "
+#define PREFIX_INFO "[INFO] "
+#define PREFIX_DEBUG "[DEBUG] "
+#define LOG(_level_, _format_, ...) \
+	if ((int)(logging::_level_) <= (int)(logging::kLevel)) { \
+		FILE* _stream_ = logging::_level_ == 0 ? stderr : stdout; \
+		std::fprintf(_stream_, PREFIX_##_level_ _format_ "\n", ##__VA_ARGS__); \
 	}
-}
+#endif
 
-class Log {
- public:
-	Log(const Level& level, std::ostream& stream = std::cout)
-		:	level_(level), stream_(stream)
-	{}
-	~Log() {
-		// @TODO: always flush?
-		if (level_ >= kLevel)
-			return;
-		stream_ << ToString(level_) << kSep << sstream_.rdbuf() << std::endl;
-	}
-	template<typename Type>
-	Log& operator<<(const Type& value) {
-		sstream_ << value;
-		return *this;
-	}
- private:
-	Level level_;
-	std::ostream& stream_;
-	std::stringstream sstream_;
-};
-#define LOG(level) logger::Log(logger::Level::level)
-} //logger
-#endif //__LOG_H__
+#endif // __LOG_H__
